@@ -1,0 +1,52 @@
+name: Build from zip
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Unpack Cosmic-IDE-custom.zip
+        run: unzip -q Cosmic-IDE-custom.zip
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install patch tools
+        run: brew install binutils jq ncurses zstd gnu-tar python
+
+      - name: Give permission to executable
+        working-directory: Cosmic-IDE-custom
+        run: chmod +x gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          build-root-directory: Cosmic-IDE-custom
+
+      - name: Generate glibc.tar.zst
+        working-directory: Cosmic-IDE-custom
+        run: bash ./scripts/build-glibc.sh
+
+      - name: Build with gradle
+        working-directory: Cosmic-IDE-custom
+        run: ./gradlew :app:assembleProdDebug
+
+      - name: Upload debug apk
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-arm64-v8a
+          path: Cosmic-IDE-custom/app/build/outputs/apk/prod/debug/app-prod-arm64-v8a-debug.apk
